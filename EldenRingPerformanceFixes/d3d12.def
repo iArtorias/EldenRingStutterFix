@@ -1,0 +1,22 @@
+LIBRARY d3d12
+EXPORTS
+  D3D12CreateDevice=D3D12CreateDevice_proxy @101
+
+  D3D12CoreCreateLayeredDevice=D3D12CoreCreateLayeredDevice_wrapper @104
+  D3D12CoreGetLayeredDeviceSize=D3D12CoreGetLayeredDeviceSize_wrapper @105
+  D3D12CoreRegisterLayers=D3D12CoreRegisterLayers_wrapper @106
+  D3D12CreateRootSignatureDeserializer=D3D12CreateRootSignatureDeserializer_wrapper @107
+  D3D12CreateVersionedRootSignatureDeserializer=D3D12CreateVersionedRootSignatureDeserializer_wrapper @108
+  D3D12DeviceRemovedExtendedData=D3D12DeviceRemovedExtendedData_wrapper @109
+  D3D12EnableExperimentalFeatures=D3D12EnableExperimentalFeatures_wrapper @110
+  D3D12GetDebugInterface=D3D12GetDebugInterface_wrapper @102
+  D3D12GetInterface=D3D12GetInterface_wrapper @111
+  D3D12PIXEventsReplaceBlock=D3D12PIXEventsReplaceBlock_wrapper @112
+  D3D12PIXGetThreadInfo=D3D12PIXGetThreadInfo_wrapper @113
+  D3D12PIXNotifyWakeFromFenceSignal=D3D12PIXNotifyWakeFromFenceSignal_wrapper @114
+  D3D12PIXReportCounter=D3D12PIXReportCounter_wrapper @115
+  D3D12SerializeRootSignature=D3D12SerializeRootSignature_wrapper @116
+  D3D12SerializeVersionedRootSignature=D3D12SerializeVersionedRootSignature_wrapper @117
+  GetBehaviorValue=GetBehaviorValue_wrapper @100
+  SetAppCompatStringPointer=SetAppCompatStringPointer_wrapper @103
+  ExportByOrdinal99 @99 NONAME
