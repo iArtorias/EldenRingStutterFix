@@ -88,6 +88,7 @@ BOOL APIENTRY DllMain(
 
         D3D12CreateDevice_real = (PFN_D3D12_CREATE_DEVICE)GetProcAddress(realDll, "D3D12CreateDevice");
         CHECK_NULL(D3D12CreateDevice_real);
+        MessageBoxA(nullptr, "Hooked d3d12.dll", "Debug", MB_OK);
     }
     else if (ul_reason_for_call == DLL_PROCESS_DETACH)
     {

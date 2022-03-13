@@ -88,4 +88,3 @@ public:
 	virtual D3D12_DRIVER_MATCHING_IDENTIFIER_STATUS CheckDriverMatchingIdentifier(D3D12_SERIALIZED_DATA_TYPE SerializedDataType, const D3D12_SERIALIZED_DATA_DRIVER_MATCHING_IDENTIFIER* pIdentifierToCheck);
 };
 
-extern Microsoft::WRL::ComPtr<ID3D12Device_proxy> g_device;
