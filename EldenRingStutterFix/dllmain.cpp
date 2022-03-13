@@ -25,25 +25,25 @@ extern "C" void SetAppCompatStringPointer_wrapper();
 extern "C" void ExportByOrdinal99();
 
 LPCSTR mImportNames[] = {
-  "D3D12CoreCreateLayeredDevice",
-  "D3D12CoreGetLayeredDeviceSize",
-  "D3D12CoreRegisterLayers",
-  "D3D12CreateDevice",
-  "D3D12CreateRootSignatureDeserializer",
-  "D3D12CreateVersionedRootSignatureDeserializer",
-  "D3D12DeviceRemovedExtendedData",
-  "D3D12EnableExperimentalFeatures",
-  "D3D12GetDebugInterface",
-  "D3D12GetInterface",
-  "D3D12PIXEventsReplaceBlock",
-  "D3D12PIXGetThreadInfo",
-  "D3D12PIXNotifyWakeFromFenceSignal",
-  "D3D12PIXReportCounter",
-  "D3D12SerializeRootSignature",
-  "D3D12SerializeVersionedRootSignature",
-  "GetBehaviorValue",
-  "SetAppCompatStringPointer",
-  (LPCSTR)99,
+    "D3D12CoreCreateLayeredDevice",
+    "D3D12CoreGetLayeredDeviceSize",
+    "D3D12CoreRegisterLayers",
+    "D3D12CreateDevice",
+    "D3D12CreateRootSignatureDeserializer",
+    "D3D12CreateVersionedRootSignatureDeserializer",
+    "D3D12DeviceRemovedExtendedData",
+    "D3D12EnableExperimentalFeatures",
+    "D3D12GetDebugInterface",
+    "D3D12GetInterface",
+    "D3D12PIXEventsReplaceBlock",
+    "D3D12PIXGetThreadInfo",
+    "D3D12PIXNotifyWakeFromFenceSignal",
+    "D3D12PIXReportCounter",
+    "D3D12SerializeRootSignature",
+    "D3D12SerializeVersionedRootSignature",
+    "GetBehaviorValue",
+    "SetAppCompatStringPointer",
+    (LPCSTR)99,
 };
 
 
@@ -53,10 +53,7 @@ LPCSTR mImportNames[] = {
 PFN_D3D12_CREATE_DEVICE D3D12CreateDevice_real;
 HMODULE realDll;
 
-BOOL APIENTRY DllMain(
-    HMODULE hModule,
-    DWORD  ul_reason_for_call,
-    LPVOID lpReserved)
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
 {
     if (ul_reason_for_call == DLL_PROCESS_ATTACH)
     {

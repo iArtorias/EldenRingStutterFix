@@ -18,6 +18,13 @@ void log(std::string msg)
     os << msg;
 }
 
+
+////////// Ext classes //////////
+//
+// Extended info that's attached to D3D12 objects.
+// Implemented as COM classes so D3D12 can automatically clean them up.
+//
+
 #define COMMAND_ALLOCATOR_CACHE_CAPACITY 8
 
 struct CommandAllocatorCacheEntry
@@ -105,6 +112,12 @@ DEFINE_GUID(GUID_D3D12CommandListExt, 0x4ad2a837, 0x234c, 0x46b4, 0x87, 0xdf, 0x
 // {07E5F7AB-5CE8-4AA1-A4D4-ABE8428A2A74}
 DEFINE_GUID(GUID_D3D12DeviceExt, 0x7e5f7ab, 0x5ce8, 0x4aa1, 0xa4, 0xd4, 0xab, 0xe8, 0x42, 0x8a, 0x2a, 0x74);
 
+
+////////// Hooks //////////
+//
+// These functions are injected into D3D12 vtables
+//
+
 namespace IUnknown_hook
 {
     typedef ULONG(*PFN_Release)(IUnknown* __this);
@@ -112,11 +125,15 @@ namespace IUnknown_hook
 
 namespace ID3D12CommandAllocator_hook
 {
+    ///// ID3D12CommandAllocator::Release
+    // Cache command allocators instead of destroying them
+
     IUnknown_hook::PFN_Release Release_real = nullptr;
     ULONG Release_hook(ID3D12CommandAllocator* __this)
     {
         ULONG cref = Release_real(__this);
 
+        // there are actually 0 refs since we added a ref when creating the command allocator
         if (cref == 1)
         {
             UINT dataSize = sizeof(D3D12CommandAllocatorExt*);
@@ -153,14 +170,19 @@ namespace ID3D12CommandAllocator_hook
             }
         }
 
-        return cref;
+        return cref ? cref - 1 : 0;
     }
 }
 
 namespace ID3D12Device_hook
 {
+    ///// ID3D12Device::CreateCommandAllocator
+    // Retrieve CommandAllocators from the cache to deal with CreateCommandAllocator spam
+
     typedef HRESULT(*PFN_CreateCommandAllocator)(ID3D12Device* __this, D3D12_COMMAND_LIST_TYPE type, const IID& riid, void** ppCommandAllocator);
+
     PFN_CreateCommandAllocator CreateCommandAllocator_real = nullptr;
+
     std::mutex vtMutex;
 
     bool GetCachedCommandAllocator(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE type, void** ppCommandAllocator)
@@ -227,6 +249,9 @@ namespace ID3D12Device_hook
     }
 
 
+    ///// ID3D12Device::CreateCommittedResource
+    // Add D3D12_HEAP_FLAG_CREATE_NOT_ZEROED flag to speed up creating committed resources
+
     typedef HRESULT(*PFN_CreateCommittedResource)(
         ID3D12Device* __this,
         const D3D12_HEAP_PROPERTIES* pHeapProperties,
@@ -254,6 +279,9 @@ namespace ID3D12Device_hook
     }
 
 
+    ///// ID3D12Device::CreatePipelineLibrary
+    // Ignore mismatch driver/device since Elden Ring doesn't detect the proper error code
+
     typedef HRESULT(*PFN_CreatePipelineLibrary)(
         const void* pLibraryBlob,
         SIZE_T BlobLength,
@@ -280,11 +308,14 @@ namespace ID3D12Device_hook
     }
 }
 
-HRESULT WINAPI D3D12CreateDevice_proxy(
-    _In_opt_ IUnknown* pAdapter,
-    D3D_FEATURE_LEVEL MinimumFeatureLevel,
-    _In_ REFIID riid, // Expected: ID3D12Device
-    _COM_Outptr_opt_ void** ppDevice)
+
+////////// Exports //////////
+//
+// Functions exported by the DLL.
+// Unmodified functions are defined in d3d12_asm.asm
+// 
+
+HRESULT WINAPI D3D12CreateDevice_hook(IUnknown* pAdapter, D3D_FEATURE_LEVEL MinimumFeatureLevel, REFIID riid, void** ppDevice)
 {
     HRESULT hr = D3D12CreateDevice_real(pAdapter, MinimumFeatureLevel, riid, ppDevice);
     

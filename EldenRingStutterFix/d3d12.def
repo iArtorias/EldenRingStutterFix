@@ -1,6 +1,6 @@
 LIBRARY d3d12
 EXPORTS
-  D3D12CreateDevice=D3D12CreateDevice_proxy @101
+  D3D12CreateDevice=D3D12CreateDevice_hook @101
 
   D3D12CoreCreateLayeredDevice=D3D12CoreCreateLayeredDevice_wrapper @104
   D3D12CoreGetLayeredDeviceSize=D3D12CoreGetLayeredDeviceSize_wrapper @105
