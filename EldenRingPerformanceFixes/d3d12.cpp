@@ -1,20 +1,30 @@
 #include "pch.h"
 #include "d3d12.h"
-#include "d3d12_device.h"
 #include <string>
 #include <wrl/client.h>
-#include <detours/detours.h>
 #include <initguid.h>
+#include <mutex>
+#include <iomanip>
+#include <fstream>
+#include <sstream>
 
 using Microsoft::WRL::ComPtr;
+
+std::mutex logMutex;
+void log(std::string msg)
+{
+    std::lock_guard<std::mutex> lock(logMutex);
+    std::ofstream os("perf.log", std::ios_base::app);
+    os << msg;
+}
+
+#define COMMAND_ALLOCATOR_CACHE_CAPACITY 8
 
 struct CommandAllocatorCacheEntry
 {
     D3D12_COMMAND_LIST_TYPE type;
     ID3D12CommandAllocator* commandAllocator;
 };
-
-#define COMMAND_ALLOCATOR_CACHE_CAPACITY 8
 
 class D3D12DeviceExt : public IUnknown
 {
@@ -127,7 +137,7 @@ namespace ID3D12CommandAllocator_hook
                                 {
                                     deviceExt->commandAllocatorCache[i].commandAllocator = __this;
                                     deviceExt->commandAllocatorCache[i].type = commandAllocatorExt->type;
-                                    return cref;
+                                    return cref - 1;
                                 }
                                 else
                                 {
@@ -138,7 +148,7 @@ namespace ID3D12CommandAllocator_hook
                     }
 
                     // if there's no room in the cache, destroy the allocator
-                    cref = Release_real(__this);
+                    return Release_real(__this);
                 }
             }
         }
@@ -151,12 +161,12 @@ namespace ID3D12Device_hook
 {
     typedef HRESULT(*PFN_CreateCommandAllocator)(ID3D12Device* __this, D3D12_COMMAND_LIST_TYPE type, const IID& riid, void** ppCommandAllocator);
     PFN_CreateCommandAllocator CreateCommandAllocator_real = nullptr;
+    std::mutex vtMutex;
 
     bool GetCachedCommandAllocator(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE type, void** ppCommandAllocator)
     {
         if (ID3D12CommandAllocator_hook::Release_real != nullptr)
         {
-            // check the cache first
             UINT dataSize = sizeof(D3D12DeviceExt*);
             ComPtr<D3D12DeviceExt> deviceExt;
             if (SUCCEEDED(device->GetPrivateData(GUID_D3D12DeviceExt, &dataSize, static_cast<D3D12DeviceExt**>(&deviceExt))))
@@ -167,6 +177,7 @@ namespace ID3D12Device_hook
                     if (deviceExt->commandAllocatorCache[i].commandAllocator != nullptr && deviceExt->commandAllocatorCache[i].type == type)
                     {
                         *ppCommandAllocator = deviceExt->commandAllocatorCache[i].commandAllocator;
+                        deviceExt->commandAllocatorCache[i].commandAllocator->AddRef();
                         deviceExt->commandAllocatorCache[i].commandAllocator = nullptr;
                         return true;
                     }
@@ -184,7 +195,6 @@ namespace ID3D12Device_hook
         }
 
         HRESULT hr = CreateCommandAllocator_real(__this, type, riid, ppCommandAllocator);
-        MessageBoxA(nullptr, "ayy", "lmao", MB_OK);
 
         if (SUCCEEDED(hr))
         {
@@ -193,26 +203,25 @@ namespace ID3D12Device_hook
             // hook ID3D12CommandAllocator::Release
             if (ID3D12CommandAllocator_hook::Release_real == nullptr)
             {
-                void** vt = *reinterpret_cast<void***>(pCommandAllocator);
-                ID3D12CommandAllocator_hook::Release_real = static_cast<IUnknown_hook::PFN_Release>(vt[2]);
+                std::lock_guard<std::mutex> lock(vtMutex);
+                if (ID3D12CommandAllocator_hook::Release_real == nullptr)
+                {
+                    // modify vtable
+                    void** vt = *reinterpret_cast<void***>(pCommandAllocator);
+                    void** pfn = &vt[2];
+                    ID3D12CommandAllocator_hook::Release_real = static_cast<IUnknown_hook::PFN_Release>(*pfn);
 
-                DetourTransactionBegin();
-                DetourUpdateThread(GetCurrentThread());
-
-                DetourAttach(&(PVOID&)ID3D12CommandAllocator_hook::Release_real, ID3D12CommandAllocator_hook::Release_hook);
-
-                DetourTransactionCommit();
+                    DWORD OldProtection;
+                    VirtualProtect(pfn, sizeof(void*), PAGE_READWRITE, &OldProtection);
+                    *pfn = ID3D12CommandAllocator_hook::Release_hook;
+                    VirtualProtect(pfn, sizeof(void*), OldProtection, &OldProtection);
+                }
             }
 
-            // doesn't work for bundle command lists
-            if (type != D3D12_COMMAND_LIST_TYPE_BUNDLE)
-            {
-                // add a ref to keep it alive
-                pCommandAllocator->AddRef();
-                pCommandAllocator->SetPrivateDataInterface(GUID_D3D12CommandListExt, new D3D12CommandAllocatorExt(__this, type));
-            }
+            // add a ref to keep it alive
+            pCommandAllocator->AddRef();
+            pCommandAllocator->SetPrivateDataInterface(GUID_D3D12CommandListExt, new D3D12CommandAllocatorExt(__this, type));
         }
-
 
         return hr;
     }
@@ -230,18 +239,18 @@ HRESULT WINAPI D3D12CreateDevice_proxy(
     {
         ID3D12Device* device = static_cast<ID3D12Device*>(*ppDevice);
 
+        // hook ID3D12Device::CreateCommandAllocator
         if (ID3D12Device_hook::CreateCommandAllocator_real == nullptr)
         {
-            // hook ID3D12Device::CreateCommandAllocator
+            // modify vtable
             void** vt = *reinterpret_cast<void***>(device);
-            ID3D12Device_hook::CreateCommandAllocator_real = static_cast<ID3D12Device_hook::PFN_CreateCommandAllocator>(vt[10]);
+            void** pfn = &vt[9];
+            ID3D12Device_hook::CreateCommandAllocator_real = static_cast<ID3D12Device_hook::PFN_CreateCommandAllocator>(*pfn);
 
-            DetourTransactionBegin();
-            DetourUpdateThread(GetCurrentThread());
-
-            DetourAttach(&(PVOID&)ID3D12Device_hook::CreateCommandAllocator_real, ID3D12Device_hook::CreateCommandAllocator_hook);
-
-            DetourTransactionCommit();
+            DWORD OldProtection;
+            VirtualProtect(pfn, sizeof(void*), PAGE_READWRITE, &OldProtection);
+            *pfn = ID3D12Device_hook::CreateCommandAllocator_hook;
+            VirtualProtect(pfn, sizeof(void*), OldProtection, &OldProtection);
         }
 
         device->SetPrivateDataInterface(GUID_D3D12DeviceExt, new D3D12DeviceExt());
