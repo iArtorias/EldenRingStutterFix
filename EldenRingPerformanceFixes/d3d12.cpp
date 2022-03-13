@@ -236,6 +236,7 @@ namespace ID3D12Device_hook
         const D3D12_CLEAR_VALUE* pOptimizedClearValue,
         REFIID riidResource,
         void** ppvResource);
+
     PFN_CreateCommittedResource CreateCommittedResource_real = nullptr;
 
     HRESULT CreateCommittedResource_hook(
@@ -250,6 +251,32 @@ namespace ID3D12Device_hook
     {
         HeapFlags |= D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;
         return CreateCommittedResource_real(__this, pHeapProperties, HeapFlags, pDesc, InitialResourceState, pOptimizedClearValue, riidResource, ppvResource);
+    }
+
+
+    typedef HRESULT(*PFN_CreatePipelineLibrary)(
+        const void* pLibraryBlob,
+        SIZE_T BlobLength,
+        REFIID riid,
+        void** ppPipelineLibrary);
+
+    PFN_CreatePipelineLibrary CreatePipelineLibrary_real = nullptr;
+
+    HRESULT CreatePipelineLibrary_hook(
+        const void* pLibraryBlob,
+        SIZE_T BlobLength,
+        REFIID riid,
+        void** ppPipelineLibrary)
+    {
+        HRESULT hr = CreatePipelineLibrary_real(pLibraryBlob, BlobLength, riid, ppPipelineLibrary);
+        if (BlobLength > 0)
+        {
+            if (hr == D3D12_ERROR_ADAPTER_NOT_FOUND || hr == D3D12_ERROR_DRIVER_VERSION_MISMATCH)
+            {
+                hr = S_OK;
+            }
+        }
+        return hr;
     }
 }
 
@@ -274,12 +301,15 @@ HRESULT WINAPI D3D12CreateDevice_proxy(
             ID3D12Device_hook::CreateCommandAllocator_real = static_cast<ID3D12Device_hook::PFN_CreateCommandAllocator>(*pCreateCommandAllocator);
             void** pCreateCommittedResource = &vt[27];
             ID3D12Device_hook::CreateCommittedResource_real = static_cast<ID3D12Device_hook::PFN_CreateCommittedResource>(*pCreateCommittedResource);
+            void** pCreatePipelineLibrary = &vt[44];
+            ID3D12Device_hook::CreatePipelineLibrary_real = static_cast<ID3D12Device_hook::PFN_CreatePipelineLibrary>(*pCreatePipelineLibrary);
 
             DWORD OldProtection;
-            VirtualProtect(vt, sizeof(void*) * 28, PAGE_READWRITE, &OldProtection);
+            VirtualProtect(vt, sizeof(void*) * 45, PAGE_READWRITE, &OldProtection);
             *pCreateCommandAllocator = ID3D12Device_hook::CreateCommandAllocator_hook;
             *pCreateCommittedResource = ID3D12Device_hook::CreateCommittedResource_hook;
-            VirtualProtect(vt, sizeof(void*) * 28, OldProtection, &OldProtection);
+            *pCreatePipelineLibrary = ID3D12Device_hook::CreatePipelineLibrary_hook;
+            VirtualProtect(vt, sizeof(void*) * 45, OldProtection, &OldProtection);
         }
 
         device->SetPrivateDataInterface(GUID_D3D12DeviceExt, new D3D12DeviceExt());
