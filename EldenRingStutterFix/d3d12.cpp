@@ -7,16 +7,52 @@
 #include <iomanip>
 #include <fstream>
 #include <sstream>
+#include <thread>
 
 using Microsoft::WRL::ComPtr;
 
+#ifdef LOG_STATS
 std::mutex logMutex;
 void log(std::string msg)
 {
     std::lock_guard<std::mutex> lock(logMutex);
-    std::ofstream os("perf.log", std::ios_base::app);
+    std::ofstream os("d3d12_stats.log", std::ios_base::app);
     os << msg;
 }
+
+volatile UINT commandAllocatorsCreated = 0;
+volatile UINT commandAllocatorCacheHits = 0;
+volatile UINT createPsoOverrides = 0;
+volatile UINT createCommittedResourceOverrides = 0;
+
+bool loggingThreadRunning = false;
+void startLoggingThread(unsigned int interval)
+{
+    loggingThreadRunning = true;
+    std::thread([interval]()
+    {
+        while (true)
+        {
+            auto nextLogTime = std::chrono::steady_clock::now() + std::chrono::seconds(interval);
+
+            std::stringstream ss;
+            time_t now = std::time(nullptr);
+            struct tm timebuf;
+            localtime_s(&timebuf, &now);
+            ss << std::put_time(&timebuf, "%F %T ");
+            ss << "\nCommand allocators created:        " << commandAllocatorsCreated;
+            ss << "\nCommand allocator cache hits:      " << commandAllocatorCacheHits;
+            ss << "\nCreatePipelineLibrary overrides:   " << createPsoOverrides;
+            ss << "\nCreateCommittedResource overrides: " << createCommittedResourceOverrides;
+            ss << "\n\n";
+            log(ss.str());
+
+            std::this_thread::sleep_until(nextLogTime);
+        }
+    }).detach();
+}
+
+#endif
 
 
 ////////// Ext classes //////////
@@ -213,6 +249,9 @@ namespace ID3D12Device_hook
     {
         if (GetCachedCommandAllocator(__this, type, ppCommandAllocator))
         {
+#ifdef LOG_STATS
+            InterlockedIncrement(&commandAllocatorCacheHits);
+#endif
             return S_OK;
         }
 
@@ -243,6 +282,10 @@ namespace ID3D12Device_hook
             // add a ref to keep it alive
             pCommandAllocator->AddRef();
             pCommandAllocator->SetPrivateDataInterface(GUID_D3D12CommandListExt, new D3D12CommandAllocatorExt(__this, type));
+
+#ifdef LOG_STATS
+            InterlockedIncrement(&commandAllocatorsCreated);
+#endif
         }
 
         return hr;
@@ -274,6 +317,13 @@ namespace ID3D12Device_hook
         REFIID riidResource,
         void** ppvResource)
     {
+#ifdef LOG_STATS
+        if (!(HeapFlags & D3D12_HEAP_FLAG_CREATE_NOT_ZEROED))
+        {
+            InterlockedIncrement(&createCommittedResourceOverrides);
+        }
+#endif
+
         HeapFlags |= D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;
         return CreateCommittedResource_real(__this, pHeapProperties, HeapFlags, pDesc, InitialResourceState, pOptimizedClearValue, riidResource, ppvResource);
     }
@@ -301,6 +351,9 @@ namespace ID3D12Device_hook
         {
             if (hr == D3D12_ERROR_ADAPTER_NOT_FOUND || hr == D3D12_ERROR_DRIVER_VERSION_MISMATCH)
             {
+#ifdef LOG_STATS
+                InterlockedIncrement(&createPsoOverrides);
+#endif
                 hr = S_OK;
             }
         }
@@ -317,6 +370,13 @@ namespace ID3D12Device_hook
 
 HRESULT WINAPI D3D12CreateDevice_hook(IUnknown* pAdapter, D3D_FEATURE_LEVEL MinimumFeatureLevel, REFIID riid, void** ppDevice)
 {
+#ifdef LOG_STATS
+    if (!loggingThreadRunning)
+    {
+        startLoggingThread(30);
+    }
+#endif
+
     HRESULT hr = D3D12CreateDevice_real(pAdapter, MinimumFeatureLevel, riid, ppDevice);
     
     if (hr == S_OK && ppDevice != nullptr)
