@@ -208,13 +208,13 @@ namespace ID3D12Device_hook
                 {
                     // modify vtable
                     void** vt = *reinterpret_cast<void***>(pCommandAllocator);
-                    void** pfn = &vt[2];
-                    ID3D12CommandAllocator_hook::Release_real = static_cast<IUnknown_hook::PFN_Release>(*pfn);
+                    void** pRelease = &vt[2];
+                    ID3D12CommandAllocator_hook::Release_real = static_cast<IUnknown_hook::PFN_Release>(*pRelease);
 
                     DWORD OldProtection;
-                    VirtualProtect(pfn, sizeof(void*), PAGE_READWRITE, &OldProtection);
-                    *pfn = ID3D12CommandAllocator_hook::Release_hook;
-                    VirtualProtect(pfn, sizeof(void*), OldProtection, &OldProtection);
+                    VirtualProtect(vt, sizeof(void*) * 3, PAGE_READWRITE, &OldProtection);
+                    *pRelease = ID3D12CommandAllocator_hook::Release_hook;
+                    VirtualProtect(vt, sizeof(void*) * 3, OldProtection, &OldProtection);
                 }
             }
 
@@ -224,6 +224,32 @@ namespace ID3D12Device_hook
         }
 
         return hr;
+    }
+
+
+    typedef HRESULT(*PFN_CreateCommittedResource)(
+        ID3D12Device* __this,
+        const D3D12_HEAP_PROPERTIES* pHeapProperties,
+        D3D12_HEAP_FLAGS HeapFlags,
+        const D3D12_RESOURCE_DESC* pDesc,
+        D3D12_RESOURCE_STATES InitialResourceState,
+        const D3D12_CLEAR_VALUE* pOptimizedClearValue,
+        REFIID riidResource,
+        void** ppvResource);
+    PFN_CreateCommittedResource CreateCommittedResource_real = nullptr;
+
+    HRESULT CreateCommittedResource_hook(
+        ID3D12Device* __this,
+        const D3D12_HEAP_PROPERTIES* pHeapProperties,
+        D3D12_HEAP_FLAGS HeapFlags,
+        const D3D12_RESOURCE_DESC* pDesc,
+        D3D12_RESOURCE_STATES InitialResourceState,
+        const D3D12_CLEAR_VALUE* pOptimizedClearValue,
+        REFIID riidResource,
+        void** ppvResource)
+    {
+        HeapFlags |= D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;
+        return CreateCommittedResource_real(__this, pHeapProperties, HeapFlags, pDesc, InitialResourceState, pOptimizedClearValue, riidResource, ppvResource);
     }
 }
 
@@ -244,13 +270,16 @@ HRESULT WINAPI D3D12CreateDevice_proxy(
         {
             // modify vtable
             void** vt = *reinterpret_cast<void***>(device);
-            void** pfn = &vt[9];
-            ID3D12Device_hook::CreateCommandAllocator_real = static_cast<ID3D12Device_hook::PFN_CreateCommandAllocator>(*pfn);
+            void** pCreateCommandAllocator = &vt[9];
+            ID3D12Device_hook::CreateCommandAllocator_real = static_cast<ID3D12Device_hook::PFN_CreateCommandAllocator>(*pCreateCommandAllocator);
+            void** pCreateCommittedResource = &vt[27];
+            ID3D12Device_hook::CreateCommittedResource_real = static_cast<ID3D12Device_hook::PFN_CreateCommittedResource>(*pCreateCommittedResource);
 
             DWORD OldProtection;
-            VirtualProtect(pfn, sizeof(void*), PAGE_READWRITE, &OldProtection);
-            *pfn = ID3D12Device_hook::CreateCommandAllocator_hook;
-            VirtualProtect(pfn, sizeof(void*), OldProtection, &OldProtection);
+            VirtualProtect(vt, sizeof(void*) * 28, PAGE_READWRITE, &OldProtection);
+            *pCreateCommandAllocator = ID3D12Device_hook::CreateCommandAllocator_hook;
+            *pCreateCommittedResource = ID3D12Device_hook::CreateCommittedResource_hook;
+            VirtualProtect(vt, sizeof(void*) * 28, OldProtection, &OldProtection);
         }
 
         device->SetPrivateDataInterface(GUID_D3D12DeviceExt, new D3D12DeviceExt());
