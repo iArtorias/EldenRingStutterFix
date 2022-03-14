@@ -333,6 +333,7 @@ namespace ID3D12Device_hook
     // Ignore mismatch driver/device since Elden Ring doesn't detect the proper error code
 
     typedef HRESULT(*PFN_CreatePipelineLibrary)(
+        ID3D12Device* __this,
         const void* pLibraryBlob,
         SIZE_T BlobLength,
         REFIID riid,
@@ -341,21 +342,20 @@ namespace ID3D12Device_hook
     PFN_CreatePipelineLibrary CreatePipelineLibrary_real = nullptr;
 
     HRESULT CreatePipelineLibrary_hook(
+        ID3D12Device* __this,
         const void* pLibraryBlob,
         SIZE_T BlobLength,
         REFIID riid,
         void** ppPipelineLibrary)
     {
-        HRESULT hr = CreatePipelineLibrary_real(pLibraryBlob, BlobLength, riid, ppPipelineLibrary);
-        if (BlobLength > 0)
+        HRESULT hr = CreatePipelineLibrary_real(__this, pLibraryBlob, BlobLength, riid, ppPipelineLibrary);
+        if (hr == D3D12_ERROR_ADAPTER_NOT_FOUND || hr == D3D12_ERROR_DRIVER_VERSION_MISMATCH)
         {
-            if (hr == D3D12_ERROR_ADAPTER_NOT_FOUND || hr == D3D12_ERROR_DRIVER_VERSION_MISMATCH)
-            {
 #ifdef LOG_STATS
-                InterlockedIncrement(&createPsoOverrides);
+            InterlockedIncrement(&createPsoOverrides);
 #endif
-                hr = S_OK;
-            }
+            hr = CreatePipelineLibrary_real(__this, pLibraryBlob, 0, riid, ppPipelineLibrary);
+            hr = S_OK;
         }
         return hr;
     }
@@ -379,7 +379,7 @@ HRESULT WINAPI D3D12CreateDevice_hook(IUnknown* pAdapter, D3D_FEATURE_LEVEL Mini
 
     HRESULT hr = D3D12CreateDevice_real(pAdapter, MinimumFeatureLevel, riid, ppDevice);
     
-    if (hr == S_OK && ppDevice != nullptr)
+    if (SUCCEEDED(hr) && ppDevice != nullptr)
     {
         ID3D12Device* device = static_cast<ID3D12Device*>(*ppDevice);
 

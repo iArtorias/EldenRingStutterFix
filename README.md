@@ -2,9 +2,9 @@
 
 This is an unofficial patch for Elden Ring on PC which aims to fix the stuttering that a lot of players have experienced. It implements these VKD3D fixes natively in D3D12:
 
-* https://github.com/HansKristian-Work/vkd3d-proton/commit/dc622fc7156b63eb53ed677df15c9af3feb6293d
+* https://github.com/HansKristian-Work/vkd3d-proton/commit/54fbadcc9405841cc018210ba6d1045e71f405c0
 * https://github.com/HansKristian-Work/vkd3d-proton/commit/9817c52d2441bc6231afd2e5c472c7e7210a72c9
-* https://github.com/HansKristian-Work/vkd3d-proton/commit/dc622fc7156b63eb53ed677df15c9af3feb6293d
+* https://github.com/HansKristian-Work/vkd3d-proton/commit/f39ece9a7ce579a56196455933a200ec04a9d8eb
 
 # Installation
 
@@ -24,8 +24,8 @@ For now, I logged some stats to make sure everything was working as intended. Th
 ```
 Command allocators created:        241
 Command allocator cache hits:      50276
-CreatePipelineLibrary overrides:   0
+CreatePipelineLibrary overrides:   1
 CreateCommittedResource overrides: 109013
 ```
 
-The CreatePipelineLibrary workaround doesn't seem to be doing anything (not sure if it's a bug or my machine just doesn't hit that issue). The command allocator cache and CreateCommittedResource fix look to be working though, which saves on a lot of expensive memory operations.
+When running the game after a driver update, the CreatePipelineLibrary workaround is triggered once. The command allocator cache and CreateCommittedResource fix also look to be working, which saves on a lot of expensive memory operations.
