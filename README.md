@@ -1,3 +1,5 @@
+**Update: I've seen a lot of reports that this doesn't reduce stuttering and only a few reports that it does. If it does work for you, please let me know [here](https://github.com/soupstream/EldenRingStutterFix/issues/4).**
+
 # EldenRingStutterFix
 
 This is an unofficial and **experimental** patch for Elden Ring on PC which aims to fix the stuttering that a lot of players have experienced. It implements these VKD3D fixes natively in D3D12:
@@ -18,8 +20,6 @@ To uninstall, just delete `d3d12.dll` from your game folder.
 # Testing
 
 On my PC, the game didn't stutter in the first place so I haven't actually verified that this fix helps. In theory it should decrease certain kinds of stuttering in the same way that VKD3D/Proton does, but it won't necessarily improve performance otherwise.
-
-If it does work for you, please let me know [here](https://github.com/soupstream/EldenRingStutterFix/issues/4).
 
 For now, I logged some stats to make sure everything was working as intended. These were the stats after 15 minutes of playing:
 
