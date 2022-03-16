@@ -67,20 +67,6 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         for (int i = 0; i < 19; ++i)
         {
             mProcs[i] = (UINT_PTR)GetProcAddress(realDll, mImportNames[i]);
-            if (!mProcs[i])
-            {
-                std::string errorMsg = "Proc not found: ";
-                if (HIWORD(mImportNames[i]) == 0)
-                {
-                    errorMsg += std::to_string(LOWORD(mImportNames[i]));
-                }
-                else
-                {
-                    errorMsg += mImportNames[i];
-                }
-                MessageBoxA(nullptr, errorMsg.c_str(), "Error", MB_OK);
-                return FALSE;
-            }
         }
 
         D3D12CreateDevice_real = (PFN_D3D12_CREATE_DEVICE)GetProcAddress(realDll, "D3D12CreateDevice");
